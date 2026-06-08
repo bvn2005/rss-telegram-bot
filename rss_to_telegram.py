@@ -4,8 +4,8 @@ import html
 import requests
 import feedparser
 
-#RSS_URL = "https://www.motogp.com/en/rss/news"
-RSS_URL = "https://feeds.bbci.co.uk/news/rss.xml"
+RSS_URL = "https://www.motogp.com/en/rss/news"
+#RSS_URL = "https://feeds.bbci.co.uk/news/rss.xml"
 STATE_FILE = "state.json"
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
