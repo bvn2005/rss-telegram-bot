@@ -65,6 +65,9 @@ response = requests.post(
     timeout=30,
 )
 
+print(response.status_code)
+print(response.text)
+
 response.raise_for_status()
 
 state["last_link"] = link
