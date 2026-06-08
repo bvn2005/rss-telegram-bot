@@ -4,9 +4,8 @@ import html
 import requests
 
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin
 
-BASE_URL = "https://mt-news.ru/"
+BASE_URL = "https://mt-news.ru/news/"
 STATE_FILE = "state.json"
 
 BOT_TOKEN = os.environ["BOT_TOKEN"]
@@ -17,7 +16,7 @@ def load_state():
     try:
         with open(STATE_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
-    except:
+    except Exception:
         return {"last_url": ""}
 
 
@@ -29,94 +28,96 @@ def save_state(state):
 def get_latest_news():
     r = requests.get(
         BASE_URL,
+        headers={"User-Agent": "Mozilla/5.0"},
         timeout=30,
-        headers={
-            "User-Agent": "Mozilla/5.0"
-        }
     )
 
     r.raise_for_status()
 
     soup = BeautifulSoup(r.text, "html.parser")
 
-    article = soup.select_one(
-        "a.border.border-radius.padding"
+    news_block = soup.select_one("div[id^='news_list-']")
+
+    if not news_block:
+        raise Exception("News list not found")
+
+    first_link = news_block.find("a", href=True)
+
+    if not first_link:
+        raise Exception("News link not found")
+
+    url = first_link["href"]
+
+    title_tag = first_link.find("h3")
+
+    title = (
+        title_tag.get_text(" ", strip=True)
+        if title_tag else ""
     )
 
-    if not article:
-        raise Exception("News block not found")
-
-    url = urljoin(BASE_URL, article["href"])
-
-    title_tag = article.find("h3")
-
-    title = ""
-
-    if title_tag:
-        title = title_tag.get_text(" ", strip=True)
-
-    return {
-        "url": url,
-        "title": title
-    }
+    return url, title
 
 
 def get_article(url):
     r = requests.get(
         url,
+        headers={"User-Agent": "Mozilla/5.0"},
         timeout=30,
-        headers={
-            "User-Agent": "Mozilla/5.0"
-        }
     )
 
     r.raise_for_status()
 
     soup = BeautifulSoup(r.text, "html.parser")
 
-    h1 = soup.find("h1")
+    h1 = soup.select_one("#base-single-area h1")
 
     if not h1:
         raise Exception("Title not found")
 
     title = h1.get_text(" ", strip=True)
 
-    content = soup.find(
-        "div",
-        class_="text margin-top"
+    content = soup.select_one(
+        "#base-single-area .text.margin-top"
     )
 
     if not content:
         raise Exception("Article content not found")
 
+    for tag in content.find_all(["script", "style"]):
+        tag.decompose()
+
+    for div in content.find_all("div"):
+        div.decompose()
+
     image_url = None
 
     img = content.find("img")
 
-    if img:
-        image_url = img.get("src")
+    if img and img.get("src"):
+        image_url = img["src"]
 
     text_parts = []
 
-    for tag in content.find_all(["p", "blockquote"]):
+    for p in content.find_all("p"):
 
-        text = tag.get_text(" ", strip=True)
+        txt = p.get_text(" ", strip=True)
 
-        if not text:
+        if not txt:
             continue
 
-        if "Yandex.RTB" in text:
-            continue
-
-        text_parts.append(text)
+        text_parts.append(txt)
 
     article_text = "\n\n".join(text_parts)
 
     return title, article_text, image_url
 
 
-def send_to_telegram(title, article_text, article_url, image_url):
-
+def send_to_telegram(
+    title,
+    article_text,
+    article_url,
+    image_url
+):
     title = html.escape(title)
 
     article_text = article_text[:3500]
@@ -150,9 +151,9 @@ def send_to_telegram(title, article_text, article_url, image_url):
                 "photo": image_url,
                 "caption": message,
                 "parse_mode": "HTML",
-                "reply_markup": keyboard
+                "reply_markup": keyboard,
             },
-            timeout=30
+            timeout=30,
         )
 
     else:
@@ -164,9 +165,8 @@ def send_to_telegram(title, article_text, article_url, image_url):
                 "text": message,
                 "parse_mode": "HTML",
                 "reply_markup": keyboard,
-                "disable_web_page_preview": False
             },
-            timeout=30
+            timeout=30,
         )
 
     print(response.status_code)
@@ -179,9 +179,7 @@ def main():
 
     state = load_state()
 
-    news = get_latest_news()
-
-    latest_url = news["url"]
+    latest_url, _ = get_latest_news()
 
     if latest_url == state.get("last_url"):
         print("No new posts")
