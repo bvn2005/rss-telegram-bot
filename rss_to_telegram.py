@@ -59,6 +59,30 @@ def get_article_text(url):
     return "\n\n".join(parts)
 
 
+
+# =========================
+# Пошук тегів
+# =========================
+
+def get_tags(soup):
+
+    tags_block = soup.select_one("p.tags")
+    
+    if not tags_block:
+        return []
+    
+    tags = []
+    
+    for a in tags_block.find_all("a"):
+        tag = a.get_text(strip=True)
+    
+        if tag:
+            # робимо hashtag
+            tag = "#" + tag.replace(" ", "")
+            tags.append(tag)
+    
+    return tags
+
 # =========================
 # Завантаження state.json
 # =========================
@@ -142,7 +166,7 @@ for news in reversed(new_posts):
         class_="padding-top"
     ).get_text(strip=True)
     
-
+ 
     # =========================
     # Текст статті
     # =========================
@@ -171,7 +195,10 @@ for news in reversed(new_posts):
         article_page.text,
         "html.parser"
     )
-    
+
+    tags = get_tags(article_soup)
+    tags_text = " ".join(tags)
+        
     preview_photo = None
     
     figure = article_soup.select_one(
@@ -196,8 +223,8 @@ for news in reversed(new_posts):
             }
         ]]
     }
-    
-    
+
+
     # =========================
     # Повідомлення з фото
     # =========================
@@ -205,7 +232,8 @@ for news in reversed(new_posts):
     caption = (
         f"🏍 MotoGP News\n\n"
         f"<b>{title}</b>\n\n"
-        f"📅 {date}"
+        f"📅 {date}\n\n"
+        f"{tags_text}"
     )
     
     if preview_photo:
