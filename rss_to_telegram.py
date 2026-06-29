@@ -1,3 +1,4 @@
+import time
 # Робота з змінними середовища (BOT_TOKEN, CHAT_ID)
 import os
 # Парсер HTML
@@ -306,6 +307,7 @@ for news in reversed(new_posts):
     # Якщо Telegram повернув помилку
     response.raise_for_status()
     print("Preview sent")
+    time.sleep(2)
     
     
     # =========================
@@ -348,9 +350,28 @@ for news in reversed(new_posts):
                 },
                 timeout=30
             )
+            
+            if article_response.status_code == 429:
+                retry_after = article_response.json()["parameters"]["retry_after"]
+                print("Rate limit! Waiting:", retry_after)
+            
+                import time
+                time.sleep(retry_after)
+            
+                # повтор запиту
+                article_response = requests.post(
+                    f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                    json={
+                        "chat_id": CHAT_ID,
+                        "text": f"<blockquote expandable>{chunk}</blockquote>",
+                        "parse_mode": "HTML"
+                    },
+                    timeout=30
+                )
         
+            
             article_response.raise_for_status()
-        
+            time.sleep(1)
             print("Chunk sent:", i // MAX_LEN + 1)
     
             
